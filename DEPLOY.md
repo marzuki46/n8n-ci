@@ -21,6 +21,7 @@ Dokumentasi langkah menaikkan aplikasi ke server produksi (VPS, cPanel, atau sha
 | Composer | Diperlukan sekali saat instalasi |
 | Node.js (opsional) | Hanya untuk **Code Node** (`node` harus ada di PATH). Tanpa node, Code Node gagal |
 | Eksekusi perintah | `exec()`, `shell_exec()` boleh (dipakai Code Node & runner) |
+| Queue worker | `php spark execution:queue` berjalan terus (lihat §6) |
 
 ## 3. Deploy backend
 
@@ -111,20 +112,76 @@ cp -r dist/* ../backend/public/
   ```
   Origin dipisah koma bila lebih dari satu.
 
-## 6. Cron / workflow terjadwal
+## 6. Cron & queue worker (wajib untuk Live Execution)
 
-Tambahkan baris ini ke crontab (jalankan setiap menit):
+Ada **dua** proses background yang perlu jalan agar semua fitur bekerja:
+
+| Command | Fungsi | Kapan |
+|---|---|---|
+| `php spark cron:run` | Workflow terjadwal (Schedule Trigger) | Setiap 1 menit |
+| `php spark execution:queue` | Worker antrian eksekusi manual (Live Execution / tombol Execute) | Terus-menerus |
+
+> **PENTING:** Sejak fitur Live Execution aktif, tombol **Execute** di editor memakai
+> mode *queued* → hasilnya masuk antrian dan diproses oleh worker `execution:queue`.
+> **Tanpa worker ini berjalan, tombol Execute akan menggantung di status "running/queued"**
+> selamanya. Pastikan worker aktif sebelum memakai Live Execution.
+
+### a) Workflow terjadwal — cron tiap menit
 
 ```cron
 * * * * * /usr/local/bin/php /home/user/apps/n8n/backend/spark cron:run >/dev/null 2>&1
 ```
 
-- Di cPanel: cron job → jalankan perintah di atas, interval *Every minute*.
-- Pastikan `spark` punya izin execute. Uji manual dulu:
-  ```bash
-  php spark cron:run
-  ```
+- Di cPanel: cron job → perintah di atas, interval *Every minute*.
+- Uji manual dulu: `php spark cron:run`
 - Runner hanya memproses schedule yang `active` dan sudah jatuh tempo (`next_run`).
+
+### b) Queue worker — proses berkelanjutan (Live Execution)
+
+Worker wajib berjalan **terus-menerus** (bukan per-menit; tiap loop selesai langsung
+mengecek antrian lagi):
+
+```bash
+php spark execution:queue
+```
+
+**cPanel / shared hosting (max execution time terbatas):** jalankan sebagai
+[multi_cron](https://docs.cpanel.net/whm/plugins/multi-cron-manager/) atau pakai
+`nohup`/`setsid` lewat cron agar prosesnya tidak mati setiap menit:
+
+```cron
+# ///cron setiap menit — restart worker kalau belum ada yang jalan
+* * * * * pgrep -f "execution:queue" || nohup /usr/local/bin/php /home/user/apps/n8n/backend/spark execution:queue >>/home/user/apps/n8n/backend/writable/logs/queue.log 2>&1 &
+```
+
+**VPS / Ubuntu — gunakan systemd** agar otomatis restart (lebih disarankan). Simpan
+di `/etc/systemd/system/n8n-queue.service`:
+
+```ini
+[Unit]
+Description=n8n-CI Execution Queue Worker
+After=network.target
+
+[Service]
+WorkingDirectory=/home/user/apps/n8n/backend
+ExecStart=/usr/bin/php /home/user/apps/n8n/backend/spark execution:queue
+Restart=always
+RestartSec=3
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now n8n-queue
+sudo systemctl status n8n-queue
+```
+
+> Catatan retry: worker memakai `ExecutionQueueService` dengan `MAX_ATTEMPTS = 3`.
+> Eksekusi juga punya fail-safe pause (maks. 5 menit) supaya tidak menggantung
+> selamanya bila sinyal resume tak kunjung datang.
 
 ## 7. Login pertama & keamanan
 
@@ -189,12 +246,16 @@ curl -s -c cookies.txt -X POST https://app.example.com/api/auth/login \
 curl -s -b cookies.txt https://app.example.com/api/workflows
 
 # 4) Buat workflow sederhana (Manual Trigger -> HTTP Request / Telegram),
-#    save, lalu execute:
+#    save, publish, lalu execute (mode queued → Live Execution):
 curl -s -b cookies.txt -X POST https://app.example.com/api/workflows/1/execute \
-  -H "Content-Type: application/json" -d '{}'
-#   Harus menghasilkan execution record (status success/error), bukan HTTP 500.
+  -H "Content-Type: application/json" -d '{"queued":1}'
+#   Harus mengembalikan {"execution_id": X, "status": "queued"} (HTTP 202).
+#   Lalu cek statusnya (worker harus menjalankannya menjadi success/error):
 
-# 5) Webhook publik (tanpa auth)
+# 5) Ada endpoint kontrol Live Execution (stop/pause/resume) — worker wajib jalan
+curl -s -b cookies.txt -X POST https://app.example.com/api/executions/<id>/stop
+
+# 6) Webhook publik (tanpa auth)
 curl -s -X POST https://app.example.com/webhook/<webhook-path> -d '{"test":1}'
 ```
 
@@ -210,3 +271,4 @@ curl -s -X POST https://app.example.com/webhook/<webhook-path> -d '{"test":1}'
 | Code Node error | `node` tidak ada di PATH | `which node`; pasang Node.js di server |
 | CORS blocked di browser | frontend & backend beda origin | set `cors.allowedOrigins` |
 | Workflow terjadwal tidak jalan | cron tidak terpasang / path `spark` salah | jalankan manual `php spark cron:run` |
+| Tombol Execute menggantung di "queued/running" selamanya | Queue worker `execution:queue` tidak berjalan | `php spark execution:queue` (lihat §6b) |
