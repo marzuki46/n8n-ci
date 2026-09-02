@@ -1,0 +1,183 @@
+{
+    "slug": "seo-daily-health-check-otonom",
+    "name": "SEO – Daily Health Check (Otonom)",
+    "description": "Jadwal harian jam 02.30: cek homepage, robots.txt, sitemap.xml → log jika ada masalah.",
+    "category": "Technical SEO",
+    "workflow": {
+        "name": "SEO – Daily Health Check (Otonom)",
+        "description": "Jadwal harian jam 02.30: cek homepage, robots.txt, sitemap.xml → log jika ada masalah.",
+        "nodes": [
+            {
+                "id": "trig",
+                "name": "Jadwal Harian",
+                "type": "schedule_trigger",
+                "position": [
+                    40,
+                    120
+                ],
+                "parameters": {
+                    "cron": "30 2 * * *",
+                    "timezone": "Asia/Jakarta"
+                }
+            },
+            {
+                "id": "cfg",
+                "name": "Target Situs",
+                "type": "set",
+                "position": [
+                    260,
+                    120
+                ],
+                "parameters": {
+                    "assignments": "[{\"field\":\"site\",\"value\":\"https://situs-anda.com\"}]"
+                }
+            },
+            {
+                "id": "robots",
+                "name": "Cek robots.txt",
+                "type": "http_request",
+                "position": [
+                    480,
+                    40
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "{{$json.site}}/robots.txt",
+                    "timeout": 15,
+                    "onError": "continue"
+                }
+            },
+            {
+                "id": "home",
+                "name": "Cek Homepage",
+                "type": "http_request",
+                "position": [
+                    480,
+                    160
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "{{$json.site}}/",
+                    "timeout": 20,
+                    "onError": "continue"
+                }
+            },
+            {
+                "id": "smap",
+                "name": "Cek sitemap.xml",
+                "type": "http_request",
+                "position": [
+                    480,
+                    280
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "{{$json.site}}/sitemap.xml",
+                    "timeout": 15,
+                    "onError": "continue"
+                }
+            },
+            {
+                "id": "sum",
+                "name": "Ringkas Kesehatan",
+                "type": "code",
+                "position": [
+                    760,
+                    160
+                ],
+                "parameters": {
+                    "entryPoint": "Run Once for All Items",
+                    "code": "var robots = items[0] && items[0].json ? String(items[0].json) : '';\nvar home = items[1] || {};\nvar sitemap = items[2] || {};\nvar issues = [];\nvar robotsStatus = Number(robots.status || 0);\nvar homeStatus = Number(home.status || 0);\nvar smapStatus = Number(sitemap.status || 0);\nif (robotsStatus !== 200) issues.push('robots.txt tidak 200 (status ' + robotsStatus + ')');\nelse if (!/sitemap:/i.test(String(robots.json || ''))) issues.push('robots.txt tanpa directive Sitemap');\nif (homeStatus !== 200) issues.push('Homepage tidak 200 (status ' + homeStatus + ')');\nif (smapStatus !== 200) issues.push('sitemap.xml tidak 200 (status ' + smapStatus + ')');\nreturn [{ json: {\n  checked_at: new Date().toISOString(),\n  robots_status: robotsStatus,\n  homepage_status: homeStatus,\n  sitemap_status: smapStatus,\n  healthy: issues.length === 0,\n  issues: issues\n} }];"
+                }
+            },
+            {
+                "id": "bad",
+                "name": "Tidak Sehat",
+                "type": "filter",
+                "position": [
+                    1000,
+                    160
+                ],
+                "parameters": {
+                    "matchType": "all",
+                    "conditions": [
+                        {
+                            "left": "{{$json.healthy}}",
+                            "operator": "==",
+                            "right": false
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "log",
+                "name": "Alarm",
+                "type": "log",
+                "position": [
+                    1240,
+                    160
+                ],
+                "parameters": {
+                    "level": "error",
+                    "message": "SITE UNHEALTHY: {{JSON.stringify($json.issues)}}"
+                }
+            }
+        ],
+        "connections": [
+            {
+                "source": "trig",
+                "target": "cfg",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "cfg",
+                "target": "robots",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "cfg",
+                "target": "home",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "cfg",
+                "target": "smap",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "robots",
+                "target": "sum",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "home",
+                "target": "sum",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "smap",
+                "target": "sum",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "sum",
+                "target": "bad",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "bad",
+                "target": "log",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            }
+        ]
+    }
+}

@@ -1,0 +1,44 @@
+# Root ignores for n8n-CI monorepo
+
+# ── Node / Frontend ──
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.log
+
+# ── PHP / Backend (backend/.gitignore already covers most) ──
+backend/vendor/
+backend/.env
+backend/writable/cache/*
+!backend/writable/cache/index.html
+backend/writable/logs/*
+!backend/writable/logs/index.html
+backend/writable/session/*
+!backend/writable/session/index.html
+backend/writable/uploads/*
+!backend/writable/uploads/index.html
+backend/writable/debugbar/*
+!backend/writable/debugbar/index.html
+
+# ── OS / IDE ──
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# ── Deployment / Env ──
+.env
+.env.*
+!.env.example
+
+# ── Local dev / debug scratch (not for production) ──
+backend/writable/chk.php
+backend/writable/cron_debug.php
+backend/writable/export_templates.php
+backend/writable/seed_seo_workflows*.php
+
+# ── Temp ──
+.cache/
+.codebase-memory/
+tmp/

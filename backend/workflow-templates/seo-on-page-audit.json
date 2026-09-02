@@ -1,0 +1,68 @@
+{
+    "slug": "seo-on-page-audit",
+    "name": "SEO – On-Page Audit",
+    "description": "Audit satu halaman: title, meta desc, H1, canonical, noindex.",
+    "category": "Technical SEO",
+    "workflow": {
+        "name": "SEO – On-Page Audit",
+        "description": "Audit satu halaman: title, meta desc, H1, canonical, noindex.",
+        "nodes": [
+            {
+                "id": "trig",
+                "name": "Mulai",
+                "type": "manual_trigger",
+                "position": [
+                    40,
+                    120
+                ],
+                "parameters": {
+                    "payload": {
+                        "page_url": "https://situs-anda.com/"
+                    }
+                }
+            },
+            {
+                "id": "fetch",
+                "name": "Fetch Halaman",
+                "type": "http_request",
+                "position": [
+                    300,
+                    120
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "{{$json.page_url}}",
+                    "timeout": 20,
+                    "onError": "continue"
+                }
+            },
+            {
+                "id": "audit",
+                "name": "Audit On-Page",
+                "type": "code",
+                "position": [
+                    560,
+                    120
+                ],
+                "parameters": {
+                    "entryPoint": "Run Once for All Items",
+                    "code": "var html = String((items[0] && items[0].json) || '');\nfunction m(re){ var r = html.match(re); return r ? r[1] : ''; }\nvar title = m(/<title[^>]*>([\\s\\S]*?)<\\/title>/i).trim();\nvar dm = html.match(/<meta[^>]+name=[\"']description[\"'][^>]*content=[\"']([^\"']*)[\"']/i);\nvar desc = dm ? dm[1] : '';\nvar h1s = html.match(/<h1[\\s>]/gi) || [];\nvar canon = m(/<link[^>]+rel=[\"']canonical[\"'][^>]*href=[\"']([^\"']+)[\"']/i);\nvar noindex = /name=[\"']robots[\"'][^>]*content=[\"'][^\"']*noindex/i.test(html);\nvar issues = [];\nif (!title) issues.push('Title kosong'); else if (title.length > 65) issues.push('Title terlalu panjang (' + title.length + ' char)');\nif (!desc) issues.push('Meta description kosong'); else if (desc.length > 165) issues.push('Meta description terlalu panjang');\nif (h1s.length === 0) issues.push('H1 tidak ada'); else if (h1s.length > 1) issues.push('H1 ganda (' + h1s.length + ')');\nif (!canon) issues.push('Canonical tidak ada');\nif (noindex) issues.push('noindex terdeteksi');\nreturn [{ json: {\n  audited_url: ((items[0] || {}).url) || '',\n  title: title.slice(0, 250),\n  desc_length: desc.length,\n  h1_count: h1s.length,\n  canonical: canon,\n  noindex: noindex,\n  issue_count: issues.length,\n  issues: issues\n} }];"
+                }
+            }
+        ],
+        "connections": [
+            {
+                "source": "trig",
+                "target": "fetch",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "fetch",
+                "target": "audit",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            }
+        ]
+    }
+}

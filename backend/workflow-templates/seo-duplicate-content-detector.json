@@ -1,0 +1,171 @@
+{
+    "slug": "seo-duplicate-content-detector",
+    "name": "SEO – Duplicate Content Detector",
+    "description": "Bandingkan konten antar halaman di sitemap; kelompokkan yang identik/near-identik.",
+    "category": "Technical SEO",
+    "workflow": {
+        "name": "SEO – Duplicate Content Detector",
+        "description": "Bandingkan konten antar halaman di sitemap; kelompokkan yang identik/near-identik.",
+        "nodes": [
+            {
+                "id": "trig",
+                "name": "Mulai",
+                "type": "manual_trigger",
+                "position": [
+                    40,
+                    120
+                ],
+                "parameters": {
+                    "payload": {
+                        "sitemap_url": "http://127.0.0.1:8081/test-sitemap-pages.xml"
+                    }
+                }
+            },
+            {
+                "id": "fetch",
+                "name": "Fetch Sitemap",
+                "type": "http_request",
+                "position": [
+                    260,
+                    120
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "{{$json.sitemap_url}}",
+                    "timeout": 15,
+                    "onError": "continue"
+                }
+            },
+            {
+                "id": "locs",
+                "name": "Extract URL",
+                "type": "code",
+                "position": [
+                    480,
+                    120
+                ],
+                "parameters": {
+                    "entryPoint": "Run Once for All Items",
+                    "code": "const raw = (items[0] && items[0].json !== undefined) ? items[0].json : '';\nconst xml = typeof raw === 'string' ? raw : JSON.stringify(raw);\nconst locs = [];\nxml.replace(/<loc>\\s*([^<\\s]+)\\s*<\\/loc>/gi, function(m, u){ locs.push(u); return m; });\nreturn locs.map(function(u){ return { json: { url: u } }; });"
+                }
+            },
+            {
+                "id": "getpage",
+                "name": "Fetch Tiap Halaman",
+                "type": "http_request",
+                "position": [
+                    700,
+                    120
+                ],
+                "parameters": {
+                    "method": "GET",
+                    "url": "{{$json.url}}",
+                    "timeout": 15,
+                    "onError": "continue"
+                }
+            },
+            {
+                "id": "hashn",
+                "name": "Hash Konten",
+                "type": "code",
+                "position": [
+                    920,
+                    120
+                ],
+                "parameters": {
+                    "entryPoint": "Run Once for All Items",
+                    "code": "return items.map(function(it){\n  var html = String(it.json || '');\n  var text = html\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim()\n    .toLowerCase();\n  var h1 = 0x811c9dc5;\n  for (var i = 0; i < text.length; i++) {\n    h1 ^= text.charCodeAt(i);\n    h1 = (h1 * 0x01000193) >>> 0;\n  }\n  return { json: { url: it.url || '', hash: 'fnv' + h1.toString(16), words: text === '' ? 0 : text.split(' ').length } };\n});"
+                }
+            },
+            {
+                "id": "group",
+                "name": "Kelompokkan Duplikat",
+                "type": "code",
+                "position": [
+                    1140,
+                    120
+                ],
+                "parameters": {
+                    "entryPoint": "Run Once for All Items",
+                    "code": "var byHash = {};\nfor (var i = 0; i < items.length; i++) {\n  var d = items[i].json || {};\n  if (!d.hash || (d.words || 0) < 20) continue;\n  if (!byHash[d.hash]) byHash[d.hash] = [];\n  byHash[d.hash].push(d.url);\n}\nvar out = [];\nObject.keys(byHash).forEach(function(h){\n  if (byHash[h].length > 1) out.push({ json: { duplicate_group: h, count: byHash[h].length, urls: byHash[h] } });\n});\nreturn out;"
+                }
+            },
+            {
+                "id": "found",
+                "name": "Ada Duplikat",
+                "type": "filter",
+                "position": [
+                    1360,
+                    120
+                ],
+                "parameters": {
+                    "matchType": "all",
+                    "conditions": [
+                        {
+                            "left": "{{$json.count}}",
+                            "operator": ">=",
+                            "right": 2
+                        }
+                    ]
+                }
+            },
+            {
+                "id": "log",
+                "name": "Lapor Duplikat",
+                "type": "log",
+                "position": [
+                    1580,
+                    120
+                ],
+                "parameters": {
+                    "level": "warning",
+                    "message": "DUPLIKAT x{{$json.count}}: {{JSON.stringify($json.urls)}}"
+                }
+            }
+        ],
+        "connections": [
+            {
+                "source": "trig",
+                "target": "fetch",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "fetch",
+                "target": "locs",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "locs",
+                "target": "getpage",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "getpage",
+                "target": "hashn",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "hashn",
+                "target": "group",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "group",
+                "target": "found",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            },
+            {
+                "source": "found",
+                "target": "log",
+                "sourceHandle": "out-1",
+                "targetHandle": "in-1"
+            }
+        ]
+    }
+}
