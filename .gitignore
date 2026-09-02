@@ -32,6 +32,10 @@ Thumbs.db
 .env.*
 !.env.example
 
+# ── Markdown docs (keep out of deploy repo) ──
+*.md
+*.MD
+
 # ── Local dev / debug scratch (not for production) ──
 backend/writable/chk.php
 backend/writable/cron_debug.php
