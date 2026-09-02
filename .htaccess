@@ -1,0 +1,43 @@
+# ============================================================
+# WEBROOT .htaccess — layout FLAT CodeIgniter 4
+# Pasang di: public_html/mas.juki.eu.org/.htaccess
+# ============================================================
+
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+    Options +FollowSymlinks
+    RewriteEngine On
+
+    # --- Blokir akses langsung ke folder / file sensitif ---
+    RewriteRule ^(app|system|writable|vendor|tests)(/|$) - [F,L,NC]
+    RewriteRule ^(\.env|env|spark|composer\.(json|lock)|preload\.php|phpunit)(/|$) - [F,L,NC]
+
+    # Trailing slash redirect
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # www -> non-www (aktifkan bila perlu)
+    # RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+    # RewriteRule ^ http://%1%{REQUEST_URI} [R=301,L]
+
+    # Kirim semuanya ke front controller
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^([\s\S]*)$ index.php/$1 [L,NC,QSA]
+
+    # Teruskan Authorization header (API key)
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+    ErrorDocument 404 index.php
+</IfModule>
+
+# Jangan layani dotfiles bila rewrite mati
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

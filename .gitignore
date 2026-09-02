@@ -1,48 +1,48 @@
-# Root ignores for n8n-CI monorepo
+# ============================================
+# n8n-CI — PRODUCTION (FLAT LAYOUT)
+# Root = webroot. ZIP isi root ini langsung
+# bisa diupload ke public_html.
+# ============================================
 
-# ── Node / Frontend ──
-node_modules/
-frontend/node_modules/
-frontend/dist/
+# ---- Vendor / runtime ----
+vendor/
 *.log
 
-# ── PHP / Backend (backend/.gitignore already covers most) ──
-backend/vendor/
-backend/.env
-backend/writable/cache/*
-!backend/writable/cache/index.html
-backend/writable/logs/*
-!backend/writable/logs/index.html
-backend/writable/session/*
-!backend/writable/session/index.html
-backend/writable/uploads/*
-!backend/writable/uploads/index.html
-backend/writable/debugbar/*
-!backend/writable/debugbar/index.html
+# ---- writable: simpan hanya placeholder index.html / .htaccess ----
+writable/cache/*
+!writable/cache/index.html
+writable/logs/*
+!writable/logs/index.html
+writable/session/*
+!writable/session/index.html
+writable/uploads/*
+!writable/uploads/index.html
+writable/debugbar/*
+!writable/debugbar/index.html
 
-# ── OS / IDE ──
+# ---- Source / dev (sudah ada di branch `main`) ----
+frontend/
+wordpress-plugin/
+node_modules/
+frontend/dist/
+
+# ---- Env / Secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Dokumen (tidak ikut repo production) ----
+*.md
+*.MD
+
+# ---- OS / IDE ----
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.iml
 
-# ── Deployment / Env ──
-.env
-.env.*
-!.env.example
-
-# ── Markdown docs (keep out of deploy repo) ──
-*.md
-*.MD
-
-# ── Local dev / debug scratch (not for production) ──
-backend/writable/chk.php
-backend/writable/cron_debug.php
-backend/writable/export_templates.php
-backend/writable/seed_seo_workflows*.php
-
-# ── Temp ──
+# ---- Temp / cache lokal ----
 .cache/
 .codebase-memory/
 tmp/
