@@ -9,8 +9,12 @@ const auth = useAuthStore()
 const ui = useUiStore()
 const router = useRouter()
 
-const email = ref('owner@local.dev')
-const password = ref('owner123')
+// Login custom path sudah diganti (localStorage.login_slug di-set router).
+// Ketika URL login diganti, kredensial default tidak boleh ditampilkan/diisi.
+const customLogin = !!localStorage.getItem('login_slug')
+
+const email = ref(customLogin ? '' : 'owner@local.dev')
+const password = ref(customLogin ? '' : 'owner123')
 const loading = ref(false)
 const error = ref('')
 const googleEnabled = ref(false)
@@ -78,7 +82,7 @@ async function submit() {
         </a>
       </form>
 
-      <p class="login-hint">Demo: owner@local.dev / owner123</p>
+      <p v-if="!customLogin" class="login-hint">Demo: owner@local.dev / owner123</p>
     </div>
   </div>
 </template>

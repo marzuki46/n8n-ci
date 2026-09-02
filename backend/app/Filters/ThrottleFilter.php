@@ -13,19 +13,40 @@ use CodeIgniter\HTTP\ResponseInterface;
  */
 class ThrottleFilter implements FilterInterface
 {
-    protected const WINDOW = 900; // 15 menit
-    protected const MAX_ATTEMPTS = 5;
+    /**
+     * Jumlah maksimum percobaan dalam satu jendela waktu.
+     * Dapat disesuaikan lewat .env: THROTTLE_MAX_ATTEMPTS.
+     */
+    protected function maxAttempts(): int
+    {
+        $value = env('THROTTLE_MAX_ATTEMPTS');
+        $value = filter_var($value, FILTER_VALIDATE_INT);
+
+        return ($value !== false && $value > 0) ? $value : 5;
+    }
+
+    /**
+     * Jendela waktu (detik) untuk rate-limit.
+     * Dapat disesuaikan lewat .env: THROTTLE_WINDOW.
+     */
+    protected function window(): int
+    {
+        $value = env('THROTTLE_WINDOW');
+        $value = filter_var($value, FILTER_VALIDATE_INT);
+
+        return ($value !== false && $value > 0) ? $value : 900;
+    }
 
     public function before(RequestInterface $request, $arguments = null)
     {
         $cache    = service('cache');
         $attempts = (int) $cache->get($this->key($request));
 
-        if ($attempts >= static::MAX_ATTEMPTS) {
+        if ($attempts >= $this->maxAttempts()) {
             return service('response')
                 ->setStatusCode(429)
                 ->setContentType('application/json')
-                ->setHeader('Retry-After', (string) static::WINDOW)
+                ->setHeader('Retry-After', (string) $this->window())
                 ->setBody(json_encode([
                     'success' => false,
                     'message' => 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.',
@@ -50,7 +71,7 @@ class ThrottleFilter implements FilterInterface
         if ($response->getStatusCode() === 401) {
             // Login gagal → naikkan counter
             $attempts = (int) $cache->get($key);
-            $cache->save($key, $attempts + 1, static::WINDOW);
+            $cache->save($key, $attempts + 1, $this->window());
         }
     }
 

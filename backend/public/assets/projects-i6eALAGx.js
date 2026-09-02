@@ -1,0 +1,1 @@
+import{a9 as s,s as a}from"./index-D8O6seCy.js";const o=s("projects",{state:()=>({list:[],loaded:!1}),actions:{async load(){const t=await a.get("/projects");this.list=t.data||[],this.loaded=!0}}});export{o as u};
